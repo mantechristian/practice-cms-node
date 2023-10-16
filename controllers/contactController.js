@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const Contact = require('../models/contactModel');
+const Fuse = require('fuse.js');
 
 //@desc get all contacts
 //@route GET /api/contacts
@@ -28,15 +29,17 @@ const getContact = asyncHandler(async (req, res) => {
 const getFilteredContacts = asyncHandler(async (req, res) => {
     // Get the search text from the request body
     const searchText = req.body.searchText;
-    // Filter the contacts by name, email, phone
-    const filteredContacts = await Contact.find({
-        user_id: req.user.id,
-        $or: [
-            { name: { $regex: searchText, $options: 'i' } },
-            { email: { $regex: searchText, $options: 'i' } },
-            { phone: { $regex: searchText, $options: 'i' } },
-        ],
-    });
+    // Get all contacts for the user
+    const contacts = await Contact.find({ user_id: req.user.id });
+    // Set up options for fuzzy matching
+    const options = {
+        keys: ['name', 'email', 'phone'],
+        threshold: 0.3,
+    };
+    // Create a new Fuse instance with the contacts and options
+    const fuse = new Fuse(contacts, options);
+    // Search for contacts that match the search text
+    const filteredContacts = fuse.search(searchText);
     console.log('filteredContacts: ', filteredContacts);
     // Send the filtered contacts as response
     res.status(200).json(filteredContacts);
